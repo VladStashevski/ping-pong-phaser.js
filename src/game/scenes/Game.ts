@@ -28,6 +28,8 @@ export class Game extends Scene {
     private paddleWidth!: number;
     private ballRadius!: number;
     private aiDifficulty: number = 0.3;
+    private touchSensitivity: number = 1.5; // Множитель чувствительности для мобильных устройств
+    private lastTouchY: number = 0;
 
     constructor() {
         super('Game');
@@ -172,6 +174,23 @@ export class Game extends Scene {
 
     public decreaseAIDifficulty(amount: number = 0.1): void {
         this.setAIDifficulty(this.aiDifficulty - amount);
+    }
+
+    // Методы для настройки чувствительности касаний
+    public setTouchSensitivity(sensitivity: number): void {
+        this.touchSensitivity = Math.max(0.1, Math.min(5.0, sensitivity));
+    }
+
+    public getTouchSensitivity(): number {
+        return this.touchSensitivity;
+    }
+
+    public increaseTouchSensitivity(amount: number = 0.1): void {
+        this.setTouchSensitivity(this.touchSensitivity + amount);
+    }
+
+    public decreaseTouchSensitivity(amount: number = 0.1): void {
+        this.setTouchSensitivity(this.touchSensitivity - amount);
     }
 
     private updateSpeedDisplay(): void {
@@ -347,21 +366,39 @@ export class Game extends Scene {
         this.ballVelocity.y = speed * angle;
     }
 
-    private handleTouch(_pointer: Phaser.Input.Pointer): void {
+    private handleTouch(pointer: Phaser.Input.Pointer): void {
         if (this.gameState === 'waiting') {
             this.gameState = 'playing';
             this.instructionText.setVisible(false);
             this.resetBall();
         }
+
+        // Запоминаем начальную позицию касания
+        this.lastTouchY = pointer.y;
     }
 
     private handleTouchMove(pointer: Phaser.Input.Pointer): void {
         if (this.gameState === 'playing' && this.isMobile) {
-            const targetY = pointer.y;
+            // Вычисляем разность движения пальца
+            const deltaY = pointer.y - this.lastTouchY;
+
+            // Применяем множитель чувствительности
+            const sensitiveMovement = deltaY * this.touchSensitivity;
+
+            // Новая позиция ракетки
+            const newY = this.playerPaddle.y + sensitiveMovement;
+
             const paddleBounds = this.paddleHeight / 2;
-            if (targetY >= paddleBounds && targetY <= this.gameHeight - paddleBounds) {
-                this.playerPaddle.y = targetY;
+
+            // Ограничиваем движение границами экрана
+            if (newY >= paddleBounds && newY <= this.gameHeight - paddleBounds) {
+                this.playerPaddle.y = newY;
+            } else {
+                // Если выходим за границы, ставим на границу
+                this.playerPaddle.y = Math.max(paddleBounds, Math.min(this.gameHeight - paddleBounds, newY));
             }
+
+            this.lastTouchY = pointer.y;
         }
     }
 
