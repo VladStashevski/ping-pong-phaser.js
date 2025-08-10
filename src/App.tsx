@@ -17,11 +17,26 @@ function App() {
             setIsMobile(isMobileDevice);
         };
 
+        // Фикс для iOS Safari viewport
+        const setVH = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+
         checkOrientation();
         checkMobile();
+        setVH();
 
-        window.addEventListener('resize', checkOrientation);
-        window.addEventListener('orientationchange', checkOrientation);
+        window.addEventListener('resize', () => {
+            checkOrientation();
+            setVH();
+        });
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                checkOrientation();
+                setVH();
+            }, 100);
+        });
 
         return () => {
             window.removeEventListener('resize', checkOrientation);
@@ -36,7 +51,7 @@ function App() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                height: '100vh',
+                height: 'calc(var(--vh, 1vh) * 100)',
                 backgroundColor: '#000',
                 color: '#fff',
                 textAlign: 'center',
@@ -50,9 +65,9 @@ function App() {
     }
 
     return (
-        <div id="app" style={{ 
-            width: '100vw', 
-            height: '100vh', 
+        <div id="app" style={{
+            width: '100vw',
+            height: 'calc(var(--vh, 1vh) * 100)',
             overflow: 'hidden',
             display: 'flex',
             alignItems: 'center',
