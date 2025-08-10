@@ -40,9 +40,9 @@ export class Game extends Scene {
         this.gameWidth = this.scale.width;
         this.gameHeight = this.scale.height;
 
-        this.paddleHeight = this.gameHeight * 0.15;
+        this.paddleHeight = this.gameHeight * 0.25;
         this.paddleWidth = Math.max(8, this.gameWidth * 0.008);
-        this.ballRadius = Math.max(6, Math.min(this.gameWidth, this.gameHeight) * 0.008);
+        this.ballRadius = Math.max(10, Math.min(this.gameWidth, this.gameHeight) * 0.015);
 
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || this.scale.displaySize.width <= 768;
 
@@ -370,9 +370,9 @@ export class Game extends Scene {
         this.gameHeight = this.scale.height;
 
 
-        this.paddleHeight = this.gameHeight * 0.15;
+        this.paddleHeight = this.gameHeight * 0.25;
         this.paddleWidth = Math.max(8, this.gameWidth * 0.008);
-        this.ballRadius = Math.max(6, Math.min(this.gameWidth, this.gameHeight) * 0.008);
+        this.ballRadius = Math.max(10, Math.min(this.gameWidth, this.gameHeight) * 0.015);
 
 
         const background = this.children.getAt(0) as Phaser.GameObjects.Rectangle;
