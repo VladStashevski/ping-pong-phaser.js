@@ -30,6 +30,8 @@ export class Game extends Scene {
     private aiDifficulty: number = 0.3;
     private touchSensitivity: number = 1.5; // Множитель чувствительности для мобильных устройств
     private lastTouchY: number = 0;
+    private aiTargetY: number = 0; // Целевая позиция для плавного движения
+    private aiCurrentSpeed: number = 0; // Текущая скорость AI для плавности
 
     constructor() {
         super('Game');
@@ -60,6 +62,10 @@ export class Game extends Scene {
 
         this.aiPaddle = this.add.rectangle(this.gameWidth - this.paddleWidth / 2, this.gameHeight / 2, this.paddleWidth, this.paddleHeight, 0xffffff);
         this.aiPaddle.setStrokeStyle(1, 0xffffff);
+
+        // Инициализируем AI параметры
+        this.aiTargetY = this.gameHeight / 2;
+        this.aiCurrentSpeed = 0;
 
         this.cursors = this.input.keyboard!.createCursorKeys();
         this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
@@ -256,42 +262,8 @@ export class Game extends Scene {
         }
 
 
-        const ballY = this.ball.y;
-        const aiPaddleY = this.aiPaddle.y;
-        let aiSpeed = paddleSpeed * (0.4 + this.aiDifficulty * 0.4);
-
-
-        const mistakeChance = (1 - this.aiDifficulty) * 0.3;
-        const mistake = Math.random();
-
-        if (mistake < mistakeChance) {
-            const mistakeType = Math.random();
-            if (mistakeType < 0.4) {
-                aiSpeed = -aiSpeed * 0.5;
-            } else if (mistakeType < 0.7) {
-                aiSpeed = 0;
-            } else {
-                aiSpeed *= 0.2;
-            }
-        }
-
-
-        const ballMovingTowardsAI = this.ballVelocity.x > 0;
-        if (!ballMovingTowardsAI) {
-            aiSpeed *= (0.2 + this.aiDifficulty * 0.3);
-        }
-
-
-        const predictionError = (1 - this.aiDifficulty) * 60;
-        const targetY = ballY + (Math.random() - 0.5) * predictionError;
-
-        const deadZone = 10 + (1 - this.aiDifficulty) * 20;
-
-        if (targetY < aiPaddleY - deadZone && this.aiPaddle.y > paddleBounds) {
-            this.aiPaddle.y -= aiSpeed;
-        } else if (targetY > aiPaddleY + deadZone && this.aiPaddle.y < this.gameHeight - paddleBounds) {
-            this.aiPaddle.y += aiSpeed;
-        }
+        // AI движение - улучшенная версия с плавностью
+        this.updateAI(paddleSpeed, paddleBounds);
 
 
         this.ball.x += this.ballVelocity.x;
@@ -321,6 +293,9 @@ export class Game extends Scene {
             this.ballVelocity = { x: 0, y: 0 };
             this.playerPaddle.setPosition(this.paddleWidth / 2, this.gameHeight / 2);
             this.aiPaddle.setPosition(this.gameWidth - this.paddleWidth / 2, this.gameHeight / 2);
+            // Сбрасываем AI параметры
+            this.aiTargetY = this.gameHeight / 2;
+            this.aiCurrentSpeed = 0;
         } else if (this.ball.x > this.gameWidth + this.ballRadius) {
             this.playerScore++;
             this.playerScoreText.setText(this.playerScore.toString());
@@ -330,6 +305,9 @@ export class Game extends Scene {
             this.ballVelocity = { x: 0, y: 0 };
             this.playerPaddle.setPosition(this.paddleWidth / 2, this.gameHeight / 2);
             this.aiPaddle.setPosition(this.gameWidth - this.paddleWidth / 2, this.gameHeight / 2);
+            // Сбрасываем AI параметры
+            this.aiTargetY = this.gameHeight / 2;
+            this.aiCurrentSpeed = 0;
         }
     }
 
@@ -353,6 +331,72 @@ export class Game extends Scene {
         const speed = this.ballSpeed * (this.game.loop.delta / 1000);
         this.ballVelocity.x = speed * direction;
         this.ballVelocity.y = speed * angle;
+    }
+
+    private updateAI(paddleSpeed: number, paddleBounds: number): void {
+        const ballY = this.ball.y;
+        const aiPaddleY = this.aiPaddle.y;
+
+        // Увеличиваем базовую скорость AI (было 0.4-0.8, стало 0.7-1.2)
+        const baseSpeed = paddleSpeed * (0.7 + this.aiDifficulty * 0.5);
+
+        // Система ошибок AI - но реже и мягче
+        const mistakeChance = (1 - this.aiDifficulty) * 0.15; // Уменьшили с 0.3 до 0.15
+        const mistake = Math.random();
+
+        let speedMultiplier = 1;
+        if (mistake < mistakeChance) {
+            const mistakeType = Math.random();
+            if (mistakeType < 0.3) {
+                speedMultiplier = -0.3; // Мягче неправильное направление
+            } else if (mistakeType < 0.6) {
+                speedMultiplier = 0.1; // Замедление вместо полной остановки
+            } else {
+                speedMultiplier = 0.4; // Менее резкое замедление
+            }
+        }
+
+        // AI менее активен когда мяч летит от него
+        const ballMovingTowardsAI = this.ballVelocity.x > 0;
+        if (!ballMovingTowardsAI) {
+            speedMultiplier *= (0.4 + this.aiDifficulty * 0.4); // Улучшили реакцию
+        }
+
+        // Предсказание позиции мяча с меньшей ошибкой
+        const predictionError = (1 - this.aiDifficulty) * 40; // Уменьшили с 60 до 40
+        const rawTargetY = ballY + (Math.random() - 0.5) * predictionError;
+
+        // Плавное обновление целевой позиции (сглаживание)
+        const targetLerpFactor = 0.1 + this.aiDifficulty * 0.1; // От 0.1 до 0.2
+        this.aiTargetY = Phaser.Math.Linear(this.aiTargetY, rawTargetY, targetLerpFactor);
+
+        // Уменьшенная мертвая зона
+        const deadZone = 5 + (1 - this.aiDifficulty) * 10; // Уменьшили с 10+20 до 5+10
+
+        // Плавное ускорение/замедление
+        const targetSpeed = baseSpeed * speedMultiplier;
+        const acceleration = paddleSpeed * 0.3; // Ускорение для плавности
+
+        if (this.aiTargetY < aiPaddleY - deadZone) {
+            // Нужно двигаться вверх
+            this.aiCurrentSpeed = Math.max(this.aiCurrentSpeed - acceleration, -targetSpeed);
+        } else if (this.aiTargetY > aiPaddleY + deadZone) {
+            // Нужно двигаться вниз
+            this.aiCurrentSpeed = Math.min(this.aiCurrentSpeed + acceleration, targetSpeed);
+        } else {
+            // В мертвой зоне - плавно останавливаемся
+            this.aiCurrentSpeed *= 0.9;
+        }
+
+        // Применяем движение с ограничениями
+        const newY = aiPaddleY + this.aiCurrentSpeed;
+        if (newY >= paddleBounds && newY <= this.gameHeight - paddleBounds) {
+            this.aiPaddle.y = newY;
+        } else {
+            // Останавливаемся у границ
+            this.aiPaddle.y = Math.max(paddleBounds, Math.min(this.gameHeight - paddleBounds, newY));
+            this.aiCurrentSpeed = 0; // Сбрасываем скорость при столкновении с границей
+        }
     }
 
     private resetBall(): void {
